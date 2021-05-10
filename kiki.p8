@@ -15,7 +15,7 @@ function _init()
         drop_cd= 0,
         dash_cd= 0,
         drop_done=true,
-        carry_weight=4,
+        carry_weight=0,
     }
 
     cam = {
@@ -26,14 +26,24 @@ function _init()
         offset_y=0,
     }
 
-    pickups = {100}
-    dropoffs = {20}
+    delivered = 0
+    orders = {new_order(100, 20)}
 
-    frames = 0 
-    air_resistance, acc, gravity = 0.95, 0.3, 0.1
+    frames = 0
+    day_length = 60 * 60
+    air_resistance, acc, gravity = 0.9, 0.3, 0.1
+    max_carry_weight = 5
 
     update_fn = update_main_menu
     draw_fn = draw_main_menu
+end
+
+function new_order(pickup, dropoff)
+    return {
+        pickup=pickup,
+        dropoff=dropoff,
+        got=false,
+    }
 end
 
 function _update60()
@@ -69,7 +79,7 @@ function update_gameplay()
     -- drop
     kiki["drop_cd"] -= 1
     if btnp(🅾️) and kiki["drop_cd"] <= 0 and kiki["drop_done"] then
-        kiki["dy"] = 4
+        kiki["dy"] = 6
         kiki["drop_cd"] = 30
         kiki["drop_done"] = false
     end
@@ -100,7 +110,7 @@ function update_gameplay()
     -- set kiki position
     kiki["x"] += kiki["dx"]
     kiki["y"] += kiki["dy"]
-    if kiki["y"] > 110 and kiki["dy"] >= 0 then
+    if kiki["y"] > 90 and kiki["dy"] >= 0 then
         kiki["dy"] *= 0.2
         kiki["dx"] *= 0.2
     end
@@ -112,28 +122,38 @@ function update_gameplay()
     -- TODO: don't spawn too close to the player
     -- TODO: make sure to spawn the drop off spot a little ways from the player
     -- TODO: don't spawn pickup and drop off spots too close to each other
-    if flr(rnd(60 * 2)) == 1 then
-        add(pickups, rnd(4096))
-        add(dropoffs, rnd(4096))
+    if flr(rnd(60 * 3)) == 1 then
+        add(orders, new_order(rnd(1024), rnd(1024)))
     end
     
     -- check pickup/ dropoff
     local pickup, dropoff = check_pickup(), check_dropoff()
-    if pickup > 0 then
-        deli(pickups, pickup)
+    if pickup > 0 and kiki["carry_weight"] < max_carry_weight then
+        orders[pickup]["got"] = true
         kiki["carry_weight"] += 1
     end
-    if dropoff > 0 then
-        deli(dropoffs, dropoff)
+    if dropoff > 0 and kiki["carry_weight"] > 0 then
+        deli(orders, dropoff)
         kiki["carry_weight"] -= 1
+        delivered += 1
+    end
+
+    if frames > day_length + 240 then
+        frames = 0
+        camera(0, 0)
+        fadepal(0)
+        update_fn = update_score_board
+        draw_fn = draw_score_board
     end
 end
 
 function check_pickup()
     local dist = 10
-    for i, pickup in ipairs(pickups) do
-        if kiki["y"] > 100 and kiki["x"] + 4 > pickup - dist and kiki["x"] + 4 < pickup + 8 + dist then
-            return i
+    for i, order in ipairs(orders) do
+        if not order["got"] then
+            if kiki["y"] > 90 and kiki["x"] + 4 > order["pickup"] - dist and kiki["x"] + 4 < order["pickup"] + 8 + dist then
+                return i
+            end
         end
     end
     return -1
@@ -141,40 +161,54 @@ end
 
 function check_dropoff()
     local dist = 10
-    for i, dropoff in ipairs(dropoffs) do
-        if kiki["y" > 100 and kiki["x"] + 4 > dropoff - dist and kiki["x"] + 4 < dropoff + 8 + dist then
-            return i
+    for i, order in ipairs(orders) do
+        if order["got"] then
+            if kiki["y"] > 90 and kiki["x"] + 4 > order["dropoff"] - dist and kiki["x"] + 4 < order["dropoff"] + 8 + dist then
+                return i
+            end
         end
     end
     return -1
 end
 
 function draw_gameplay()
-    cls(blue)
+    if frames < day_length then
+        cls(blue)
+    end
+    if frames >= day_length then
+        cls(dark_blue)
+    end
+    if frames > day_length + 100 then
+        cls(black)
+    end
 
     -- draw the ui
     camera(0, 0)
     draw_dash_ui()
     draw_weight_ui()
+    draw_score()
+
     print(_debug, 5, 15, red)
     _debug = ""
 
     camera(cam["x"], cam["y"])
+    do_day_cycle(frames)
 
     -- draw the map. we'll probably end up wanting to use one of these sections
     -- for the paralax bg. It will be ok to repeat it more because it will scroll much
     -- more slowly
     map(0, 0, 0, 64, 128, 8)
     map(0, 8, 1024, 64, 128, 8)
-    map(0, 16, 2048, 64, 128, 8)
-    map(0, 24, 3072, 64, 128, 8)
+    -- map(0, 16, 2048, 64, 128, 8)
+    -- map(0, 24, 3072, 64, 128, 8)
 
     -- draw pickup/ dropoff
-    for _, pickup in ipairs(pickups) do
-        spr(11, pickup, 100)
-    end
-    for _, dropoff in ipairs(dropoffs) do
-        spr(12, dropoff, 100)
+    for _, order in ipairs(orders) do
+        if order["got"] then
+            spr(11, order["dropoff"], 100)
+        else
+            spr(12, order["pickup"], 100)
+        end
     end
 
     palt(blue, true)
@@ -216,9 +250,26 @@ function move_camera(x, y, center, face_right)
 end
 
 -->8
+-- score board
+function update_score_board()
+    if btnp(❎) or btnp(🅾️) then
+        update_fn = update_main_menu
+        draw_fn = draw_main_menu
+    end
+end
+
+function draw_score_board()
+    cls(blue)
+    print("final score: " .. delivered, 35, 20, red)
+    print("press ❎/🅾️ to return", 24, 80, red)
+    print("to the menu", 38, 90, red)
+end
+
+-->8
 -- main menu
 function update_main_menu()
     if btnp(❎) or btnp(🅾️) then
+        delivered = 0
         draw_fn = draw_gameplay
         update_fn = update_gameplay
     end
@@ -243,6 +294,84 @@ function draw_weight_ui()
     for i=1,kiki["carry_weight"],1 do
         spr(14, 100+i*4, 5)
     end
+end
+
+function draw_score()
+    print(delivered, 60, 5, red)
+end
+
+function do_day_cycle(daytime)
+    fadepal(0)
+    if daytime < 20 then
+        fadepal(1-(daytime/20))
+    end
+    if daytime > day_length then
+        fadepal((daytime-day_length)/240)
+    end
+end
+
+function fadepal(_perc)
+ -- this function sets the
+ -- color palette so everything
+ -- you draw afterwards will
+ -- appear darker
+ -- it accepts a number from
+ -- 0 means normal
+ -- 1 is completely black
+ -- this function has been
+ -- adapted from the jelpi.p8
+ -- demo
+ 
+ -- first we take our argument
+ -- and turn it into a 
+ -- percentage number (0-100)
+ -- also making sure its not
+ -- out of bounds  
+ local p=flr(mid(0,_perc,1)*100)
+ 
+ -- these are helper variables
+ local kmax,col,dpal,j,k
+ 
+ -- this is a table to do the
+ -- palette shifiting. it tells
+ -- what number changes into
+ -- what when it gets darker
+ -- so number 
+ -- 15 becomes 14
+ -- 14 becomes 13
+ -- 13 becomes 1
+ -- 12 becomes 3
+ -- etc...
+ dpal={0,1,1, 2,1,13,6,
+          4,4,9,3, 13,1,13,14}
+ 
+ -- now we go trough all colors
+ for j=1,15 do
+  --grab the current color
+  col = j
+  
+  --now calculate how many
+  --times we want to fade the
+  --color.
+  --this is a messy formula
+  --and not exact science.
+  --but basically when kmax
+  --reaches 5 every color gets 
+  --turns black.
+  kmax=(p+(j*1.46))/22
+  
+  --now we send the color 
+  --through our table kmax
+  --times to derive the final
+  --color
+  for k=1,kmax do
+   col=dpal[col]
+  end
+  
+  --finally, we change the
+  --palette
+  pal(j,col)
+ end
 end
 
 __gfx__
@@ -295,3 +424,9 @@ __map__
 0000191a191a191a00000000000000000000000000000000191a191a191a00000000000000000000000000000000000000191a191a0000191a000000000000000000000000000000000000191a191a000000000000191a191a191a000000191a191a000000000000000000000000191a191a00000000191a0000000000000009
 090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a09090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a09090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a090a0909
 191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a19191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a19191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a191a
+__sfx__
+354600002213422130221352111421110241242212422120221202212022120221251f1141f1101f1151e1241e125201441f1141f1101f1101f1101f1101f1151b1441b1401b1451a1441a1401d1441b1441b140
+49460000277202e7302e735277202d7302d735277202e7302e735267402973029735247202b7302b735247202a7302c740247202b7302b7352272026730267352c70000000000000000000000000000000000000
+__music__
+00 00014344
+
