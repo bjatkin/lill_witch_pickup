@@ -311,9 +311,11 @@ function draw_gameplay()
     -- draw pickup/ dropoff
     for _, order in ipairs(orders) do
         if order["got"] then
-            spr(16, order["dropoff"], 100)
+            spr(22, order["dropoff"]-4, 97, 2, 2)
+            spr(18+(frames/20)%3, order["dropoff"], 100)
         else
-            spr(18, order["pickup"], 100)
+            spr(22, order["pickup"]-4, 97, 2, 2)
+            spr(16+(frames/20)%2, order["pickup"], 100)
         end
     end
 
@@ -394,6 +396,12 @@ end
 -- main menu
 function init_main_menu()
     music(0)
+    mm_frames = 0
+    plane_count_down = 0
+    plane_height = 0
+    plane_dir = 0
+    plane_front = false
+    plane_red = false
 end
 
 function update_main_menu()
@@ -403,27 +411,126 @@ function update_main_menu()
         update_fn = update_gameplay
 
         music(-1, 300)
+        sfx(-1, 3)
     end
 end
 
 function draw_main_menu()
-    cls(blue)
-    print("kiki's delivery service", 18, 20, red)
+    mm_frames += 1
+    plane_count_down -= 1
 
-    print("press ❎/🅾️ to start", 22, 90, red)
+    cls(blue)
+    a, b, d, e = flr(sin(mm_frames/230)), flr(sin(mm_frames/350+0.25)), flr(sin(mm_frames/195)+0.5), flr(sin(mm_frames/440)+0.75)
+
+    -- top clouds
+    circfill(0+b, 13+a, 12, white)
+    circfill(8+a, -1+b, 13, white)
+    circfill(80+d, -9+b, 12, white)
+    circfill(58+d, -5+a, 14, white)
+    circfill(118+e, -1+e, 12, white)
+    circfill(129+a, 6+d, 14, white)
+    circfill(132+b, 30+a, 8, white)
+
+    circfill(-1+b, -4+d, 11, light_gray)
+    circfill(63+a, -9+e, 11, light_gray)
+    circfill(126+a, -6+a, 10, light_gray)
+    circfill(131+d, 12+a, 6, light_gray)
+
+    -- bottom clouds
+    rectfill(0+a, 100+b, 128, 128, white)
+    circfill(10+a, 95+e, 20, white)
+    circfill(32+a, 105+a, 14, white)
+    circfill(55+d, 98+d, 14, white)
+    circfill(78+d, 102+e, 12, white)
+    circfill(100+e, 100+b, 18, white)
+    circfill(128+b, 88+a, 16, white)
+
+    circfill(0+e, 116+d, 14, light_gray)
+    circfill(15+d, 130+b, 14, light_gray)
+    circfill(32+e, 126+a, 12, light_gray)
+    circfill(50+a, 135+e, 13, light_gray)
+    circfill(90+a, 134+d, 12, light_gray)
+    circfill(110+b, 126+a, 14, light_gray)
+    circfill(128+b, 109+e, 15, light_gray)
+    circfill(128+d, 128+a, 12, light_gray)
+
+    if not plane_front and plane_count_down > 0 then
+        draw_flyby_plane(plane_height, plane_dir)
+    end
+
+    spr(32, 33, 20, 6, 4) 
+    spr(54, 82, 28, 2, 3) 
+    print("delivery service", 33, 53, white)
+    print("press ❎/🅾️", 41, 106, blue)
+    print("to start", 47, 114, blue)
+
+    draw_kiki_fly_in()
+
+    if plane_count_down < 0 and flr(rnd(180)) == 1 then
+        plane_height = rnd(40) + 15
+        plane_dir = (flr(rnd(2))*2)-1
+        plane_count_down = 200
+        plane_x = 150
+        if plane_dir == 1 then
+            plane_x = -20
+        end
+        if flr(rnd(2)) == 1 then
+            plane_front = not plane_front
+        end
+        if flr(rnd(2)) == 1 then
+            plane_red = not plane_red
+        end
+    end
+    if plane_front and plane_count_down > 0 then
+        draw_flyby_plane(plane_height, plane_dir)
+    end
+end
+
+function draw_kiki_fly_in()
+    palt(black, false)
+    palt(blue, true)
+    spr(0+(mm_frames/60)%2, 60+flr(sin(mm_frames/800)*16), 72+flr(sin(mm_frames/320)*8))
+end
+
+function draw_flyby_plane(height, dir)
+    if plane_red then
+        pal(11, 8)
+        pal(3, 2)
+    else
+        pal()
+    end
+    plane_x = plane_x + dir
+    palt(blue, true)
+    frames = {9, 11, 9, 13}
+    if dir > 0 then
+        spr(frames[1+flr(mm_frames/25)%4], plane_x, height, 2, 1, true, false)
+    else
+        spr(frames[1+flr(mm_frames/25)%4], plane_x, height, 2, 1, false, false)
+    end
+    if plane_x > -50 and plane_x < 200 then
+        sfx(4, 3)
+    else
+        sfx(-1, 3)
+    end
 end
 
 -->8
 -- ui
 function draw_dash_ui()
     if kiki["dash_cd"] <= 0 then
-        spr(13, 5, 5)
+        spr(28, 5, 5)
+    else
+        spr(27, 5, 5)
     end
 end
 
 function draw_weight_ui()
-    for i=1,kiki["carry_weight"],1 do
-        spr(14, 100+i*4, 5)
+    for i=1,max_carry_weight,1 do
+        if i <= kiki["carry_weight"] then
+            spr(30, 95+i*5, 5)
+        else
+            spr(29, 95+i*5, 5)
+        end
     end
 end
 
@@ -515,12 +622,12 @@ aa222220aa2222ffaa22c00cccc8822caa22122cca22220ccca20accc02222accc9a9accc711b11b
 aa1212ffaa1c1cccccccccccccc880ccccc880ccca121ffccca11acccff121accca9a9cccccbbbbbbcccccccccc3b33b3ccccccccccbbbbbbccccccccccccccc
 aaccccccccccccccccccccccccc880cccccccccccaacccccccaaaacccccccaaccc9a9accccccccccccccccccccccccccccccccccccc333333ccccccccccccccc
 cccc442cccccccccccc11cccccc11cccccc11ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-cc4442cccc22222cc11cc11ccc1cc1ccccc11ccccccccccccccccc7777cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-c242222c22444422c1c11c1ccc1111ccccc11ccccccccccccccc77777777cccccc1c1ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-24222242242222421c111cc1c1c11c1cccc11cccccccccccccc7777777777ccccc1c1ccc1ccccc1cc11c11cccccccccccccccccccccccccccccccccccccccccc
-24442422244424221c1111c1c1c11c1cccc11cccccccccccccc7777777777ccccc1c1cccc11c11cc1cc1cc1ccccccccccccccccccccccccccccccccccccccccc
-2444224224442242c1cccc1ccc1cc1ccccc11ccccccccccccc777777777777ccccc1ccccccc1cccccccccccccccccccccccccccccccccccccccccccccccccccc
-2244242c2244242cc11cc11ccc1cc1ccccc11ccccccccccccc777777777777cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+cc4442cccc22222cc11cc11ccc1cc1ccccc11ccccccccccccccccc7777cccccccccccccccccccccccccccccc67cc67cc8ecc8ecccccccccccccccccccccccccc
+c242222c22444422c1c11c1ccc1111ccccc11ccccccccccccccc77777777ccccccccccccccccccccccccccccc67cc67cc8ecc8ecccc66cccccc88ccccccccccc
+24222242242222421c111cc1c1c11c1cccc11cccccccccccccc7777777777ccc1ccccc1c1ccccc1cc11c11cccc67cc67cc8ecc8ecc6cc6cccc8ee8cccccccccc
+24442422244424221c1111c1c1c11c1cccc11cccccccccccccc7777777777cccc11c11ccc11c11cc1cc1cc1ccc67cc67cc8ecc8ecc6cc6cccc8ee8cccccccccc
+2444224224442242c1cccc1ccc1cc1ccccc11ccccccccccccc777777777777ccccc1ccccccc1ccccccccccccc66cc66cc88cc88cccc66cccccc88ccccccccccc
+2244242c2244242cc11cc11ccc1cc1ccccc11ccccccccccccc777777777777cccccccccccccccccccccccccc66cc66cc88cc88cccccccccccccccccccccccccc
 cc2222cccc2222ccccc11cccccc11cccccc11ccccccccccccc777777777777cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 cccccccccccccccccccccccccccccccccccccccccccccccccc777777777777cccccccccbbbbbbbbbbccccccccccccccccccccccccccccbbbbbbccccccccccccc
 ccccccccccccccccccccccccccccccccccccccccccccccccccc7777777777cccccccccbbbbbbbbbbbbcccccccccccccccccccccccccbbbbbbbbbbccccccccccc
@@ -672,7 +779,7 @@ __sfx__
 494600001b73022740227451b73021740217451b73022740227451a7501d7401d745187301f7401f745187301e74020750187301f7401f745167301a7401a745147301b7401b745147501a7401a745137301b740
 354610001b1451a1241b1341d1441f1441f1451d1341d1341d135181341d1441d1401d1401d1401d1401d14500000000000000000000000000000000000000000000000000000000000000000000000000000000
 494610001b7350f7201b7301b735117201d7301d735117202173021735117201d7301b7301a7401b7401d74500000000000000000000000000000000000000000000000000000000000000000000000000000000
-011000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+6701002002a2002a2003a2003a2003a2003a2002a2002a2002a2002a2002a2002a2003a2003a2003a2000a2001a2001a2002a2002a2002a2001a2001a2000a2000a2000a2002a2003a2001a2000a2000a2000a20
 __music__
 01 00014344
 02 02034344
